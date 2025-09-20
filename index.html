@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java线程简易分析工具(by Trae)</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Java线程简易分析工具(by Trae)</h1>
+        </header>
+        
+        <main>
+            <section class="upload-section">
+                <h2>导入jstack数据</h2>
+                <div class="info-box">
+                    <p><strong>说明：</strong>本工具用于解析jstack输出数据，提供初步的统计分析结果。</p>
+                </div>
+                <div class="upload-option">
+                    <h3>粘贴线程信息</h3>
+                    <textarea id="jstackInput" placeholder="请在此粘贴jstack命令的输出内容..."></textarea>
+                </div>
+                <div class="upload-option file-upload-option">
+                    <h3>选择文件</h3>
+                    <p class="file-format-note">仅支持.txt格式文件</p>
+                    <input type="file" id="jstackFile" accept=".txt">
+                </div>
+                <button id="analyzeBtn">开始分析</button>
+            </section>
+            
+            <section class="result-section" id="resultSection" style="display: none;">
+                <h2>分析结果</h2>
+                <!-- 添加页签 -->
+                <div class="tab-container">
+                    <div class="tabs">
+                        <button class="tab-button active" data-tab="stack">线程堆栈信息</button>
+                        <button class="tab-button" data-tab="table">线程指标表格</button>
+                        <button class="tab-button" data-tab="deadlock">死锁报告</button>
+                    </div>
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="stackTab">
+                            <div id="analysisResult"></div>
+                        </div>
+                        <div class="tab-pane" id="tableTab">
+                            <div id="threadTableContainer"></div>
+                        </div>
+                        <div class="tab-pane" id="deadlockTab">
+                            <div id="deadlockReportContainer"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>注: 仅适用于jstack输出结果分析</p>
+        </footer>
+    </div>
+    
+    <script src="js/utils.js"></script>
+    <script src="js/parser.js"></script>
+    <script src="js/validator.js"></script>
+    <script src="js/visualizer.js"></script>
+    <script src="js/cpuAnalyzer.js"></script>
+    <script src="js/deadlockAnalyzer.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

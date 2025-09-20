@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
             { text: '线程ID', sortable: true, field: 'name' },
             { text: '线程状态', sortable: true, field: 'state' },
             { text: 'CPU (ms)', sortable: true, field: 'cpuTime' },
-            { text: 'Elapsed (s)', sortable: true, field: 'elapsedTime' },
+            { text: 'Elapsed (ms)', sortable: true, field: 'elapsedTime' },
             { text: 'CPU占用率 (%)', sortable: true, field: 'cpuUsage' }
         ];
         
@@ -283,10 +283,10 @@ document.addEventListener('DOMContentLoaded', function() {
             cpuTimeCell.textContent = thread.cpuTime !== null ? thread.cpuTime.toFixed(2) : '无';
             row.appendChild(cpuTimeCell);
             
-            // Elapsed耗时 (s) - 转换为秒
+            // Elapsed耗时 (ms) - 直接显示毫秒
             const elapsedTimeCell = document.createElement('td');
-            const elapsedInSeconds = thread.elapsedTime !== null ? (thread.elapsedTime / 1000).toFixed(2) : '无';
-            elapsedTimeCell.textContent = elapsedInSeconds;
+            const elapsedInMilliseconds = thread.elapsedTime !== null ? thread.elapsedTime.toFixed(2) : '无';
+            elapsedTimeCell.textContent = elapsedInMilliseconds;
             row.appendChild(elapsedTimeCell);
             
             // CPU平均使用率 (%)
@@ -315,12 +315,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortedThreads = [...threads].sort((a, b) => {
             let valueA = a[field];
             let valueB = b[field];
-            
-            // 特殊处理elapsedTime，转换为秒进行比较
-            if (field === 'elapsedTime' && valueA !== null && valueB !== null) {
-                valueA = valueA / 1000;
-                valueB = valueB / 1000;
-            }
             
             // 处理缺失值(null)的情况 - 将null值排在最后
             if (valueA === null && valueB === null) return 0;

@@ -57,7 +57,7 @@
      ```bash
      jstack <pid> > thread_dump.txt
      ```
-  - 或者使用jcmd：
+   - 或者使用jcmd：
      ```bash
      jcmd <pid> Thread.print > thread_dump.txt
      ```

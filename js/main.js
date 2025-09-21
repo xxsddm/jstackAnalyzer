@@ -1,5 +1,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 获取DOM元素
+    const featureSelection = document.getElementById('featureSelection');
+    const threadAnalysisSection = document.getElementById('threadAnalysisSection');
+    const threadComparisonSection = document.getElementById('threadComparisonSection');
     const jstackInput = document.getElementById('jstackInput');
     const jstackFile = document.getElementById('jstackFile');
     const analyzeBtn = document.getElementById('analyzeBtn');
@@ -8,9 +11,55 @@ document.addEventListener('DOMContentLoaded', function() {
     let allThreads = []; // 保存所有线程数据
     let allDeadlocks = []; // 保存所有死锁数据
     
+    // 功能选择事件监听
+    const featureOptions = document.querySelectorAll('.feature-option');
+    featureOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            const featureType = this.dataset.feature;
+            if (featureType === 'thread-analysis') {
+                featureSelection.style.display = 'none';
+                threadAnalysisSection.style.display = 'block';
+            } else if (featureType === 'thread-comparison') {
+                featureSelection.style.display = 'none';
+                threadComparisonSection.style.display = 'block';
+            }
+        });
+    });
+    
+    // 返回功能选择界面的按钮事件
+    const backToFeaturesBtn = document.getElementById('backToFeatures');
+    if (backToFeaturesBtn) {
+        backToFeaturesBtn.addEventListener('click', function() {
+            threadAnalysisSection.style.display = 'none';
+            featureSelection.style.display = 'block';
+            resultSection.style.display = 'none';
+            jstackInput.value = '';
+            jstackFile.value = '';
+        });
+    }
+    
+    // 返回功能选择界面的按钮事件（对比分析）
+    const backToFeaturesComparisonBtn = document.getElementById('backToFeaturesComparison');
+    if (backToFeaturesComparisonBtn) {
+        backToFeaturesComparisonBtn.addEventListener('click', function() {
+            threadComparisonSection.style.display = 'none';
+            featureSelection.style.display = 'block';
+            document.getElementById('comparisonResultSection').style.display = 'none';
+            document.getElementById('threadFiles').value = '';
+        });
+    }
+    
     // 绑定事件监听器
     analyzeBtn.addEventListener('click', handleAnalyze);
     jstackFile.addEventListener('change', handleFileSelect);
+    
+    // 线程信息对比分析按钮事件
+    const compareBtn = document.getElementById('compareBtn');
+    const threadFilesInput = document.getElementById('threadFiles');
+    if (compareBtn && threadFilesInput) {
+        compareBtn.addEventListener('click', handleCompare);
+        threadFilesInput.addEventListener('change', handleThreadFilesSelect);
+    }
     
     // 添加页签切换功能
     const tabButtons = document.querySelectorAll('.tab-button');
@@ -108,6 +157,361 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     /**
+     * 处理多线程信息文件选择事件
+     */
+    function handleThreadFilesSelect(event) {
+        // 文件选择事件处理（可选）
+    }
+    
+    /**
+     * 处理线程信息对比分析按钮点击事件
+     */
+    function handleCompare() {
+        const files = threadFilesInput.files;
+        
+        if (files.length < 2) {
+            showComparisonResult('请至少选择2个线程信息文件进行对比分析', true);
+            return;
+        }
+        
+        // 读取所有文件
+        const fileReaders = [];
+        const fileData = [];
+        const fileNames = [];
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            fileNames.push(file.name);
+            
+            const reader = new FileReader();
+            const promise = new Promise((resolve, reject) => {
+                reader.onload = function(e) {
+                    try {
+                        // 解析文件内容获取时间戳
+                        const content = e.target.result;
+                        const timestamp = parseTimestamp(content);
+                        fileData.push({
+                            name: file.name,
+                            content: content,
+                            timestamp: timestamp
+                        });
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = function() {
+                    reject(new Error(`读取文件 ${file.name} 时发生错误`));
+                };
+            });
+            
+            reader.readAsText(file);
+            fileReaders.push(promise);
+        }
+        
+        // 等待所有文件读取完成
+        Promise.all(fileReaders)
+            .then(() => {
+                // 按时间戳排序文件
+                fileData.sort((a, b) => a.timestamp - b.timestamp);
+                
+                // 执行对比分析
+                performThreadComparison(fileData);
+            })
+            .catch(error => {
+                showComparisonResult(`文件读取过程中发生错误: ${error.message}`, true);
+            });
+    }
+    
+    /**
+     * 解析文件时间戳
+     * @param {string} content - 文件内容
+     * @returns {Date} 时间戳
+     */
+    function parseTimestamp(content) {
+        // 查找文件开头的时间戳（格式：YYYY-MM-DD HH:MM:SS）
+        const lines = content.split('\n');
+        for (let i = 0; i < Math.min(lines.length, 10); i++) {
+            const line = lines[i].trim();
+            // 匹配时间戳格式
+            const timestampMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+            if (timestampMatch) {
+                return new Date(timestampMatch[1]);
+            }
+        }
+        // 如果没有找到时间戳，返回当前时间
+        return new Date();
+    }
+    
+    /**
+     * 执行线程对比分析
+     * @param {Array} fileData - 文件数据数组
+     */
+    function performThreadComparison(fileData) {
+        try {
+            // 解析每个文件中的线程信息
+            const parsedData = fileData.map(file => {
+                const threads = JStackParser.parse(file.content);
+                const threadsWithCPU = CPUAnalyzer.analyzeCPUUsage(threads);
+                return {
+                    name: file.name,
+                    timestamp: file.timestamp,
+                    threads: threadsWithCPU
+                };
+            });
+            
+            // 执行对比分析
+            const comparisonResult = analyzeThreadChanges(parsedData);
+            
+            // 渲染对比结果
+            renderComparisonResult(comparisonResult);
+        } catch (error) {
+            showComparisonResult(`对比分析过程中发生错误: ${error.message}`, true);
+        }
+    }
+    
+    /**
+     * 分析线程变化
+     * @param {Array} parsedData - 解析后的数据
+     * @returns {Array} 对比结果
+     */
+    function analyzeThreadChanges(parsedData) {
+        // 创建一个映射来存储每个线程ID在不同时刻的数据
+        const threadMap = new Map();
+        
+        // 遍历每个时间点的数据
+        parsedData.forEach(data => {
+            const timestamp = data.timestamp;
+            const threads = data.threads;
+            
+            // 遍历当前时间点的所有线程
+            threads.forEach(thread => {
+                // 使用线程名称和tid的组合作为唯一标识符
+                const threadId = thread.tid ? `${thread.name} (${thread.tid})` : thread.name;
+                
+                // 如果该线程ID还没有记录，则创建新条目
+                if (!threadMap.has(threadId)) {
+                    threadMap.set(threadId, []);
+                }
+                
+                // 添加当前时间点的数据
+                threadMap.get(threadId).push({
+                    timestamp: timestamp,
+                    cpuTime: thread.cpuTime,
+                    elapsedTime: thread.elapsedTime,
+                    cpuUsage: thread.cpuUsage
+                });
+            });
+        });
+        
+        // 过滤出在多个时间点都出现的线程
+        const result = [];
+        threadMap.forEach((timeSeries, threadId) => {
+            // 只处理在多个时间点都出现的线程
+            if (timeSeries.length > 1) {
+                // 按时间戳排序
+                timeSeries.sort((a, b) => a.timestamp - b.timestamp);
+                
+                // 计算变化情况
+                const changes = [];
+                for (let i = 1; i < timeSeries.length; i++) {
+                    const prev = timeSeries[i - 1];
+                    const curr = timeSeries[i];
+                    
+                    // 计算时间间隔（毫秒）
+                    const timeDiff = curr.timestamp - prev.timestamp;
+                    
+                    // 计算CPU时间变化
+                    let cpuTimeDiff = null;
+                    if (curr.cpuTime !== null && prev.cpuTime !== null) {
+                        cpuTimeDiff = curr.cpuTime - prev.cpuTime;
+                    }
+                    
+                    // 计算Elapsed时间变化
+                    let elapsedTimeDiff = null;
+                    if (curr.elapsedTime !== null && prev.elapsedTime !== null) {
+                        elapsedTimeDiff = curr.elapsedTime - prev.elapsedTime;
+                    }
+                    
+                    // 计算CPU使用率变化
+                    let cpuUsageDiff = null;
+                    if (curr.cpuUsage !== null && prev.cpuUsage !== null) {
+                        cpuUsageDiff = curr.cpuUsage - prev.cpuUsage;
+                    }
+                    
+                    // 计算时段内的平均CPU使用率
+                    let avgCpuUsage = null;
+                    if (cpuTimeDiff !== null && elapsedTimeDiff !== null && elapsedTimeDiff > 0) {
+                        avgCpuUsage = (cpuTimeDiff / elapsedTimeDiff) * 100;
+                    }
+                    
+                    changes.push({
+                        periodStart: prev.timestamp,
+                        periodEnd: curr.timestamp,
+                        timeDiff: timeDiff,
+                        cpuTimeDiff: cpuTimeDiff,
+                        elapsedTimeDiff: elapsedTimeDiff,
+                        cpuUsageDiff: cpuUsageDiff,
+                        avgCpuUsage: avgCpuUsage
+                    });
+                }
+                
+                result.push({
+                    threadId: threadId,
+                    timeSeries: timeSeries,
+                    changes: changes
+                });
+            }
+        });
+        
+        return result;
+    }
+    
+    /**
+     * 渲染对比结果
+     * @param {Array} comparisonResult - 对比结果
+     */
+    function renderComparisonResult(comparisonResult) {
+        const container = document.getElementById('comparisonResult');
+        container.innerHTML = '';
+        
+        if (comparisonResult.length === 0) {
+            showComparisonResult('没有找到在多个时间点都出现的线程', true);
+            return;
+        }
+        
+        // 创建结果标题
+        const titleElement = document.createElement('h3');
+        titleElement.textContent = `找到 ${comparisonResult.length} 个在多个时间点出现的线程`;
+        container.appendChild(titleElement);
+        
+        // 为每个线程创建对比表格
+        comparisonResult.forEach((threadData, index) => {
+            const threadElement = document.createElement('div');
+            threadElement.className = 'thread-comparison-item';
+            // 为每个线程元素添加唯一ID
+            threadElement.id = `thread-${index}`;
+            
+            // 线程标题
+            const threadTitle = document.createElement('h4');
+            threadTitle.textContent = `线程: ${threadData.threadId}`;
+            threadElement.appendChild(threadTitle);
+            
+            // 创建表格
+            const table = document.createElement('table');
+            table.className = 'thread-comparison-table';
+            // 为每个表格添加唯一ID
+            table.id = `table-${index}`;
+            
+            // 表头
+            const thead = document.createElement('thead');
+            const headerRow = document.createElement('tr');
+            const headers = [
+                '时间段', 
+                '时间间隔(ms)', 
+                'CPU时间变化(ms)', 
+                'Elapsed时间变化(ms)', 
+                'CPU使用率变化(%)', 
+                { text: '时段平均CPU使用率(%)', sortable: true, field: 'avgCpuUsage' }
+            ];
+            headers.forEach(header => {
+                const th = document.createElement('th');
+                if (typeof header === 'string') {
+                    th.textContent = header;
+                } else {
+                    th.textContent = header.text;
+                    if (header.sortable) {
+                        th.dataset.field = header.field;
+                        th.classList.add('sortable');
+                        th.addEventListener('click', () => sortComparisonTable(threadData, index, header.field));
+                    }
+                }
+                headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+            
+            // 表体
+            const tbody = document.createElement('tbody');
+            tbody.id = `tbody-${index}`; // 为每个tbody添加唯一ID
+            threadData.changes.forEach(change => {
+                const row = document.createElement('tr');
+                
+                // 时间段
+                const periodCell = document.createElement('td');
+                periodCell.textContent = `${formatTime(change.periodStart)} → ${formatTime(change.periodEnd)}`;
+                row.appendChild(periodCell);
+                
+                // 时间间隔
+                const timeDiffCell = document.createElement('td');
+                timeDiffCell.textContent = change.timeDiff.toFixed(2);
+                row.appendChild(timeDiffCell);
+                
+                // CPU时间变化
+                const cpuTimeDiffCell = document.createElement('td');
+                cpuTimeDiffCell.textContent = change.cpuTimeDiff !== null ? change.cpuTimeDiff.toFixed(2) : '无数据';
+                row.appendChild(cpuTimeDiffCell);
+                
+                // Elapsed时间变化
+                const elapsedTimeDiffCell = document.createElement('td');
+                elapsedTimeDiffCell.textContent = change.elapsedTimeDiff !== null ? change.elapsedTimeDiff.toFixed(2) : '无数据';
+                row.appendChild(elapsedTimeDiffCell);
+                
+                // CPU使用率变化
+                const cpuUsageDiffCell = document.createElement('td');
+                if (change.cpuUsageDiff !== null) {
+                    cpuUsageDiffCell.textContent = change.cpuUsageDiff.toFixed(2);
+                    // 添加颜色标识
+                    if (change.cpuUsageDiff > 0) {
+                        cpuUsageDiffCell.style.color = 'red';
+                        cpuUsageDiffCell.textContent += ' ↑';
+                    } else if (change.cpuUsageDiff < 0) {
+                        cpuUsageDiffCell.style.color = 'green';
+                        cpuUsageDiffCell.textContent += ' ↓';
+                    }
+                } else {
+                    cpuUsageDiffCell.textContent = '无数据';
+                }
+                row.appendChild(cpuUsageDiffCell);
+                
+                // 时段平均CPU使用率
+                const avgCpuUsageCell = document.createElement('td');
+                if (change.avgCpuUsage !== null) {
+                    avgCpuUsageCell.textContent = change.avgCpuUsage.toFixed(2);
+                } else {
+                    avgCpuUsageCell.textContent = '无数据';
+                }
+                row.appendChild(avgCpuUsageCell);
+                
+                tbody.appendChild(row);
+            });
+            table.appendChild(tbody);
+            
+            threadElement.appendChild(table);
+            container.appendChild(threadElement);
+        });
+        
+        // 显示结果区域
+        document.getElementById('comparisonResultSection').style.display = 'block';
+    }
+    
+    /**
+     * 格式化时间显示
+     * @param {Date} date - 时间对象
+     * @returns {string} 格式化后的时间字符串
+     */
+    function formatTime(date) {
+        return date.toLocaleString('zh-CN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+    
+    /**
      * 显示结果或错误信息
      * @param {string} message - 要显示的消息
      * @param {boolean} isError - 是否为错误信息
@@ -119,6 +523,21 @@ document.addEventListener('DOMContentLoaded', function() {
             analysisResult.innerHTML = message;
         }
         resultSection.style.display = 'block';
+    }
+    
+    /**
+     * 显示对比分析结果或错误信息
+     * @param {string} message - 要显示的消息
+     * @param {boolean} isError - 是否为错误信息
+     */
+    function showComparisonResult(message, isError = false) {
+        const container = document.getElementById('comparisonResult');
+        if (isError) {
+            container.innerHTML = `<div class="error-message">${message}</div>`;
+        } else {
+            container.innerHTML = message;
+        }
+        document.getElementById('comparisonResultSection').style.display = 'block';
     }
     
     /**
@@ -335,6 +754,128 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 重新渲染表格数据
         renderTableData(sortedThreads);
+    }
+    
+    /**
+     * 对比分析表格排序函数
+     * @param {Object} threadData - 线程数据
+     * @param {number} index - 线程索引
+     * @param {string} field - 排序列
+     */
+    function sortComparisonTable(threadData, index, field) {
+        // 为每个线程创建唯一的排序字段键
+        const sortKey = `${index}-${field}`;
+        
+        // 切换排序方向
+        sortDirections[sortKey] = !sortDirections[sortKey];
+        const ascending = sortDirections[sortKey];
+        
+        // 对线程数据进行排序
+        const sortedChanges = [...threadData.changes].sort((a, b) => {
+            let valueA = a[field];
+            let valueB = b[field];
+            
+            // 处理缺失值(null)的情况 - 将null值排在最后
+            if (valueA === null && valueB === null) return 0;
+            if (valueA === null) return ascending ? 1 : -1;
+            if (valueB === null) return ascending ? -1 : 1;
+            
+            // 数值比较
+            return ascending ? valueA - valueB : valueB - valueA;
+        });
+        
+        // 更新排序箭头
+        updateComparisonSortArrows(index, field, ascending);
+        
+        // 重新渲染表格数据
+        renderComparisonTableData(index, sortedChanges);
+    }
+    
+    /**
+     * 更新对比分析排序箭头
+     * @param {number} index - 线程索引
+     * @param {string} field - 排序列
+     * @param {boolean} ascending - 是否升序
+     */
+    function updateComparisonSortArrows(index, field, ascending) {
+        // 清除当前线程表格的所有排序箭头
+        const table = document.getElementById(`table-${index}`);
+        if (!table) return;
+        
+        const allHeaders = table.querySelectorAll('th.sortable');
+        allHeaders.forEach(header => {
+            header.classList.remove('sort-asc', 'sort-desc');
+        });
+        
+        // 设置当前列的排序箭头
+        const currentHeader = table.querySelector(`th[data-field="${field}"]`);
+        if (currentHeader) {
+            currentHeader.classList.add(ascending ? 'sort-asc' : 'sort-desc');
+        }
+    }
+    
+    /**
+     * 渲染对比分析表格数据
+     * @param {number} index - 线程索引
+     * @param {Array} changes - 变化数据
+     */
+    function renderComparisonTableData(index, changes) {
+        const tbody = document.getElementById(`tbody-${index}`);
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        changes.forEach(change => {
+            const row = document.createElement('tr');
+            
+            // 时间段
+            const periodCell = document.createElement('td');
+            periodCell.textContent = `${formatTime(change.periodStart)} → ${formatTime(change.periodEnd)}`;
+            row.appendChild(periodCell);
+            
+            // 时间间隔
+            const timeDiffCell = document.createElement('td');
+            timeDiffCell.textContent = change.timeDiff.toFixed(2);
+            row.appendChild(timeDiffCell);
+            
+            // CPU时间变化
+            const cpuTimeDiffCell = document.createElement('td');
+            cpuTimeDiffCell.textContent = change.cpuTimeDiff !== null ? change.cpuTimeDiff.toFixed(2) : '无数据';
+            row.appendChild(cpuTimeDiffCell);
+            
+            // Elapsed时间变化
+            const elapsedTimeDiffCell = document.createElement('td');
+            elapsedTimeDiffCell.textContent = change.elapsedTimeDiff !== null ? change.elapsedTimeDiff.toFixed(2) : '无数据';
+            row.appendChild(elapsedTimeDiffCell);
+            
+            // CPU使用率变化
+            const cpuUsageDiffCell = document.createElement('td');
+            if (change.cpuUsageDiff !== null) {
+                cpuUsageDiffCell.textContent = change.cpuUsageDiff.toFixed(2);
+                // 添加颜色标识
+                if (change.cpuUsageDiff > 0) {
+                    cpuUsageDiffCell.style.color = 'red';
+                    cpuUsageDiffCell.textContent += ' ↑';
+                } else if (change.cpuUsageDiff < 0) {
+                    cpuUsageDiffCell.style.color = 'green';
+                    cpuUsageDiffCell.textContent += ' ↓';
+                }
+            } else {
+                cpuUsageDiffCell.textContent = '无数据';
+            }
+            row.appendChild(cpuUsageDiffCell);
+            
+            // 时段平均CPU使用率
+            const avgCpuUsageCell = document.createElement('td');
+            if (change.avgCpuUsage !== null) {
+                avgCpuUsageCell.textContent = change.avgCpuUsage.toFixed(2);
+            } else {
+                avgCpuUsageCell.textContent = '无数据';
+            }
+            row.appendChild(avgCpuUsageCell);
+            
+            tbody.appendChild(row);
+        });
     }
     
     /**

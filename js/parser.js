@@ -1,5 +1,5 @@
 class JStackParser {
-    /**
+        /**
      * 解析jstack数据为结构化线程信息
      * @param {string} data - jstack数据内容
      * @returns {Array} 解析后的线程对象数组
@@ -26,6 +26,8 @@ class JStackParser {
                 const details = threadHeaderMatch[2];
                 const cpuTimeMatch = details.match(/cpu=([0-9.]+)ms/);
                 const elapsedTimeMatch = details.match(/elapsed=([0-9.]+)s/);
+                // 提取tid信息
+                const tidMatch = details.match(/tid=([0-9a-fx]+)/);
                 
                 // 创建新线程对象，默认状态为UNKNOWN
                 currentThread = {
@@ -41,7 +43,9 @@ class JStackParser {
                     // 解析CPU时间（毫秒）
                     cpuTime: cpuTimeMatch ? parseFloat(cpuTimeMatch[1]) : null, // 使用null表示缺失
                     // 解析elapsed时间并转换为毫秒
-                    elapsedTime: elapsedTimeMatch ? parseFloat(elapsedTimeMatch[1]) * 1000 : null // 使用null表示缺失
+                    elapsedTime: elapsedTimeMatch ? parseFloat(elapsedTimeMatch[1]) * 1000 : null, // 使用null表示缺失
+                    // 解析tid
+                    tid: tidMatch ? tidMatch[1] : null
                 };
                 
                 inStackTrace = false;

@@ -12,9 +12,28 @@
             <h1>Java线程简易分析工具(by Trae)</h1>
         </header>
         
-        <main>
+        <!-- 功能选择界面 -->
+        <section class="feature-selection" id="featureSelection">
+            <h2>请选择功能</h2>
+            <div class="feature-options">
+                <div class="feature-option" data-feature="thread-analysis">
+                    <h3>线程信息分析</h3>
+                    <p>解析单个线程信息输出数据，提供初步的统计分析结果。</p>
+                </div>
+                <div class="feature-option" data-feature="thread-comparison">
+                    <h3>线程信息对比分析</h3>
+                    <p>对比多个线程信息文件，分析线程在不同时刻的CPU使用情况变化。</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 线程分析功能界面 -->
+        <main id="threadAnalysisSection" style="display: none;">
             <section class="upload-section">
-                <h2>导入jstack/jcmd数据</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>导入jstack/jcmd数据</h2>
+                    <button id="backToFeatures" class="back-button">返回功能选择</button>
+                </div>
                 <div class="info-box">
                     <p><strong>说明：</strong>本工具用于解析jstack/jcmd获取的线程信息输出数据，提供初步的统计分析结果。</p>
                 </div>
@@ -51,6 +70,30 @@
                         </div>
                     </div>
                 </div>
+            </section>
+        </main>
+        
+        <!-- 线程信息对比分析功能界面 -->
+        <main id="threadComparisonSection" style="display: none;">
+            <section class="upload-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>线程信息对比分析</h2>
+                    <button id="backToFeaturesComparison" class="back-button">返回功能选择</button>
+                </div>
+                <div class="info-box">
+                    <p><strong>说明：</strong>本工具用于对比多个线程信息文件，分析线程在不同时刻的CPU使用情况变化。</p>
+                </div>
+                <div class="upload-option file-upload-option">
+                    <h3>选择多个线程信息文件</h3>
+                    <p class="file-format-note">支持.txt格式文件，至少需要2个文件</p>
+                    <input type="file" id="threadFiles" accept=".txt" multiple>
+                </div>
+                <button id="compareBtn">开始对比分析</button>
+            </section>
+            
+            <section class="result-section" id="comparisonResultSection" style="display: none;">
+                <h2>对比分析结果</h2>
+                <div id="comparisonResult"></div>
             </section>
         </main>
         
